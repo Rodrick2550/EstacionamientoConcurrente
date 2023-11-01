@@ -8,7 +8,7 @@ import (
 func main() {
 	parkingScene := scenes.NewParkingScene()
 
-	parkingScene.Start()
+	parkingScene.Draw()
 
-	_ = oak.Init("parkingScene")
+	_ = oak.Init("mainScene")
 }

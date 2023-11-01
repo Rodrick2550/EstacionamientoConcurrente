@@ -13,13 +13,13 @@ func NewCarManager() *CarManager {
 	}
 }
 
-func (cm *CarManager) AddCar(car *Car) {
+func (cm *CarManager) Add(car *Car) {
 	cm.Mutex.Lock()
 	defer cm.Mutex.Unlock()
 	cm.Cars = append(cm.Cars, car)
 }
 
-func (cm *CarManager) RemoveCar(car *Car) {
+func (cm *CarManager) Remove(car *Car) {
 	cm.Mutex.Lock()
 	defer cm.Mutex.Unlock()
 	for i, c := range cm.Cars {

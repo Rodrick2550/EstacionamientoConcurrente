@@ -2,7 +2,9 @@ package models
 
 import (
 	"fmt"
+	"github.com/oakmound/oak/v4/render"
 	"image/color"
+	"parking/utils"
 	"sync"
 	"time"
 
@@ -12,8 +14,9 @@ import (
 )
 
 const (
-	entranceSpot = 185.00
-	speed        = 10
+	initDoorPoint = 185.00
+	endDoorPoint  = 145.00
+	speed         = 10
 )
 
 type Car struct {
@@ -24,7 +27,9 @@ type Car struct {
 
 func NewCar(ctx *scene.Context) *Car {
 	area := floatgeom.NewRect2(445, -20, 465, 0)
-	entity := entities.New(ctx, entities.WithRect(area), entities.WithColor(color.RGBA{255, 0, 0, 255}))
+	spritePath := "assets/R.png"
+	sprite, _ := render.LoadSprite(spritePath)
+	entity := entities.New(ctx, entities.WithRect(area), entities.WithColor(color.RGBA{255, 0, 0, 255}), entities.WithRenderable(sprite), entities.WithDrawLayers([]int{1, 2}))
 
 	return &Car{
 		area:   area,
@@ -44,7 +49,7 @@ func (c *Car) Enqueue(manager *CarManager) {
 }
 
 func (c *Car) JoinDoor(manager *CarManager) {
-	for c.Y() < entranceSpot {
+	for c.Y() < initDoorPoint {
 		if !c.isCollision("down", manager.GetCars()) {
 			c.ShiftY(1)
 			time.Sleep(speed * time.Millisecond)
@@ -53,7 +58,7 @@ func (c *Car) JoinDoor(manager *CarManager) {
 }
 
 func (c *Car) ExitDoor(manager *CarManager) {
-	for c.Y() > 145 {
+	for c.Y() > endDoorPoint {
 		if !c.isCollision("up", manager.GetCars()) {
 			c.ShiftY(-1)
 			time.Sleep(speed * time.Millisecond)
@@ -154,6 +159,43 @@ func (c *Car) GoAway(manager *CarManager) {
 	}
 }
 
+func CarCycle(car *Car, manager *CarManager, parking *Parking, doorM *sync.Mutex) {
+
+	manager.Add(car)
+
+	car.Enqueue(manager)
+
+	spotAvailable := parking.GetParkingSpotAvailable()
+
+	doorM.Lock()
+
+	car.JoinDoor(manager)
+
+	doorM.Unlock()
+
+	car.Park(spotAvailable, manager)
+
+	time.Sleep(time.Millisecond * time.Duration(utils.Number(40000, 50000)))
+
+	car.LeaveSpot(manager)
+
+	parking.ReleaseParkingSpot(spotAvailable)
+
+	car.Leave(spotAvailable, manager)
+
+	doorM.Lock()
+
+	car.ExitDoor(manager)
+
+	doorM.Unlock()
+
+	car.GoAway(manager)
+
+	car.Remove()
+
+	manager.Remove(car)
+}
+
 func (c *Car) ShiftY(dy float64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -185,22 +227,22 @@ func (c *Car) Remove() {
 }
 
 func (c *Car) isCollision(direction string, cars []*Car) bool {
-	minDistance := 30.0
+	distance := 25.0
 	for _, car := range cars {
 		if direction == "left" {
-			if c.X() > car.X() && c.X()-car.X() < minDistance && c.Y() == car.Y() {
+			if c.X() > car.X() && c.X()-car.X() < distance && c.Y() == car.Y() {
 				return true
 			}
 		} else if direction == "right" {
-			if c.X() < car.X() && car.X()-c.X() < minDistance && c.Y() == car.Y() {
+			if c.X() < car.X() && car.X()-c.X() < distance && c.Y() == car.Y() {
 				return true
 			}
 		} else if direction == "up" {
-			if c.Y() > car.Y() && c.Y()-car.Y() < minDistance && c.X() == car.X() {
+			if c.Y() > car.Y() && c.Y()-car.Y() < distance && c.X() == car.X() {
 				return true
 			}
 		} else if direction == "down" {
-			if c.Y() < car.Y() && car.Y()-c.Y() < minDistance && c.X() == car.X() {
+			if c.Y() < car.Y() && car.Y()-c.Y() < distance && c.X() == car.X() {
 				return true
 			}
 		}
