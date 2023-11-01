@@ -1,8 +1,11 @@
 package models
 
-import (
-	"github.com/oakmound/oak/v4/alg/floatgeom"
-)
+import "github.com/oakmound/oak/v4/alg/floatgeom"
+
+type ParkingSpotDirection struct {
+	Direction string
+	Point     float64
+}
 
 type ParkingSpot struct {
 	area                 *floatgeom.Rect2
@@ -74,10 +77,16 @@ func (p *ParkingSpot) GetDirectionsForLeaving() *[]ParkingSpotDirection {
 }
 
 func (p *ParkingSpot) GetIsAvailable() bool {
-
 	return p.isAvailable
 }
 
 func (p *ParkingSpot) SetIsAvailable(isAvailable bool) {
 	p.isAvailable = isAvailable
+}
+
+func newParkingSpotDirection(direction string, point float64) *ParkingSpotDirection {
+	return &ParkingSpotDirection{
+		Direction: direction,
+		Point:     point,
+	}
 }

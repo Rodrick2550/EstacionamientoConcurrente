@@ -19,7 +19,6 @@ func NewParkingScene() *MainScene {
 
 func (ps *MainScene) Draw() {
 	firstTime := true
-	manager := models.NewCarManager()
 	doorM := sync.Mutex{}
 
 	_ = oak.AddScene("mainScene", scene.Scene{
@@ -34,7 +33,7 @@ func (ps *MainScene) Draw() {
 
 				for i := 0; i < 100; i++ {
 					car := models.NewCar(ctx)
-					go models.CarCycle(car, manager, parking, &doorM)
+					go models.CarCycle(car, parking, &doorM)
 
 					time.Sleep(time.Millisecond * time.Duration(utils.Number(1000, 2000)))
 				}

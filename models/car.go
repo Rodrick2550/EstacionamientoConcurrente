@@ -14,29 +14,68 @@ import (
 )
 
 const (
-	initDoorPoint = 185.00
-	endDoorPoint  = 145.00
-	speed         = 10
+    initDoorPoint = 185.00
+    endDoorPoint  = 145.00
+    speed         = 10
 )
 
 type Car struct {
-	area   floatgeom.Rect2
-	entity *entities.Entity
-	mu     sync.Mutex
+    area   floatgeom.Rect2
+    entity *entities.Entity
+    mu     sync.Mutex
+    manager *CarManager 
 }
 
+type CarManager struct {
+    Cars  []*Car
+    Mutex sync.Mutex
+}
+
+func NewCarManager() *CarManager {
+    return &CarManager{
+        Cars: make([]*Car, 0),
+    }
+}
+
+var manager = NewCarManager()
+
+func (cm *CarManager) Add(car *Car) {
+    cm.Mutex.Lock()
+    defer cm.Mutex.Unlock()
+    cm.Cars = append(cm.Cars, car)
+}
+
+func (cm *CarManager) Remove(car *Car) {
+	cm.Mutex.Lock()
+	defer cm.Mutex.Unlock()
+	for i, c := range cm.Cars {
+		if c == car {
+			cm.Cars = append(cm.Cars[:i], cm.Cars[i+1:]...)
+			break
+		}
+	}
+}
+
+func (cm *CarManager) GetCars() []*Car {
+	cm.Mutex.Lock()
+	defer cm.Mutex.Unlock()
+	return cm.Cars
+}
+
+
 func NewCar(ctx *scene.Context) *Car {
-	area := floatgeom.NewRect2(445, -20, 465, 0)
+
+    area := floatgeom.NewRect2(445, -20, 465, 0)
 	spritePath := "assets/R.png"
 	sprite, _ := render.LoadSprite(spritePath)
 	entity := entities.New(ctx, entities.WithRect(area), entities.WithColor(color.RGBA{255, 0, 0, 255}), entities.WithRenderable(sprite), entities.WithDrawLayers([]int{1, 2}))
 
-	return &Car{
-		area:   area,
-		entity: entity,
-	}
+    return &Car{
+        area:   area,
+        entity: entity,
+        manager: manager, 
+    }
 }
-
 func (c *Car) Enqueue(manager *CarManager) {
 
 	for c.Y() < 145 {
@@ -67,77 +106,84 @@ func (c *Car) ExitDoor(manager *CarManager) {
 }
 
 func (c *Car) Park(spot *ParkingSpot, manager *CarManager) {
-	for index := 0; index < len(*spot.GetDirectionsForParking()); index++ {
-		directions := *spot.GetDirectionsForParking()
-		fmt.Println("Direction: " + directions[index].Direction)
-		fmt.Println("Point: " + fmt.Sprintf("%f", directions[index].Point))
-		if directions[index].Direction == "right" {
-			for c.X() < directions[index].Point {
-				if !c.isCollision("right", manager.GetCars()) {
-					c.ShiftX(1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
-		} else if directions[index].Direction == "down" {
-			for c.Y() < directions[index].Point {
-				if !c.isCollision("down", manager.GetCars()) {
-					c.ShiftY(1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
-		} else if directions[index].Direction == "left" {
-			for c.X() > directions[index].Point {
-				if !c.isCollision("left", manager.GetCars()) {
-					c.ShiftX(-1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
-		} else if directions[index].Direction == "up" {
-			for c.Y() > directions[index].Point {
-				if !c.isCollision("up", manager.GetCars()) {
-					c.ShiftY(-1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
+	directions := *spot.GetDirectionsForParking()
+
+	for _, dir := range directions {
+		fmt.Println("Direction: " + dir.Direction)
+		fmt.Println("Point: " + fmt.Sprintf("%f", dir.Point))
+
+		switch dir.Direction {
+		case "right":
+			c.moveUntilCondition("right", dir.Point, func() bool {
+				return !c.isCollision("right", manager.GetCars())
+			})
+		case "down":
+			c.moveUntilCondition("down", dir.Point, func() bool {
+				return !c.isCollision("down", manager.GetCars())
+			})
+		case "left":
+			c.moveUntilCondition("left", dir.Point, func() bool {
+				return !c.isCollision("left", manager.GetCars())
+			})
+		case "up":
+			c.moveUntilCondition("up", dir.Point, func() bool {
+				return !c.isCollision("up", manager.GetCars())
+			})
 		}
 	}
 }
+
 
 func (c *Car) Leave(spot *ParkingSpot, manager *CarManager) {
-	for index := 0; index < len(*spot.GetDirectionsForLeaving()); index++ {
-		directions := *spot.GetDirectionsForLeaving()
-		if directions[index].Direction == "left" {
+	directions := *spot.GetDirectionsForLeaving()
 
-			for c.X() > directions[index].Point {
-				if !c.isCollision("left", manager.GetCars()) {
-					c.ShiftX(-1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
-		} else if directions[index].Direction == "right" {
-			for c.X() < directions[index].Point {
-				if !c.isCollision("right", manager.GetCars()) {
-					c.ShiftX(1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
-		} else if directions[index].Direction == "up" {
-			for c.Y() > directions[index].Point {
-				if !c.isCollision("up", manager.GetCars()) {
-					c.ShiftY(-1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
-		} else if directions[index].Direction == "down" {
-			for c.Y() < directions[index].Point {
-				if !c.isCollision("down", manager.GetCars()) {
-					c.ShiftY(1)
-					time.Sleep(speed * time.Millisecond)
-				}
-			}
+	for _, dir := range directions {
+		switch dir.Direction {
+		case "left":
+			c.moveUntilCondition("left", dir.Point, func() bool {
+				return !c.isCollision("left", manager.GetCars())
+			})
+		case "right":
+			c.moveUntilCondition("right", dir.Point, func() bool {
+				return !c.isCollision("right", manager.GetCars())
+			})
+		case "up":
+			c.moveUntilCondition("up", dir.Point, func() bool {
+				return !c.isCollision("up", manager.GetCars())
+			})
+		case "down":
+			c.moveUntilCondition("down", dir.Point, func() bool {
+				return !c.isCollision("down", manager.GetCars())
+			})
 		}
 	}
 }
+
+func (c *Car) moveUntilCondition(direction string, point float64, condition func() bool) {
+	switch direction {
+	case "left":
+		for c.X() > point && condition() {
+			c.ShiftX(-1)
+			time.Sleep(speed * time.Millisecond)
+		}
+	case "right":
+		for c.X() < point && condition() {
+			c.ShiftX(1)
+			time.Sleep(speed * time.Millisecond)
+		}
+	case "up":
+		for c.Y() > point && condition() {
+			c.ShiftY(-1)
+			time.Sleep(speed * time.Millisecond)
+		}
+	case "down":
+		for c.Y() < point && condition() {
+			c.ShiftY(1)
+			time.Sleep(speed * time.Millisecond)
+		}
+	}
+}
+
 
 func (c *Car) LeaveSpot(manager *CarManager) {
 	spotX := c.X()
@@ -159,10 +205,10 @@ func (c *Car) GoAway(manager *CarManager) {
 	}
 }
 
-func CarCycle(car *Car, manager *CarManager, parking *Parking, doorM *sync.Mutex) {
 
-	manager.Add(car)
-
+func CarCycle(car *Car, parking *Parking, doorM *sync.Mutex) {
+    car.manager.Add(car) 
+    
 	car.Enqueue(manager)
 
 	spotAvailable := parking.GetParkingSpotAvailable()
