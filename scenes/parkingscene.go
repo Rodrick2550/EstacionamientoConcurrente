@@ -32,7 +32,7 @@ func (ps *MainScene) Draw() {
 				}
 				firstTime = false
 
-				for i := 0; i < 100; i++ {
+				for {
 					car := models.NewCar(ctx)
 					go models.CarCycle(car, manager, parking, &doorM)
 
